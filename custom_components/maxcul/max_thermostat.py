@@ -7,7 +7,8 @@ import copy
 import logging
 
 from homeassistant.components.climate import (
-    ClimateEntity
+    ClimateEntity,
+    SensorEntity
 )
 
 from homeassistant.components.climate.const import (
@@ -278,11 +279,11 @@ class MaxThermostat(ClimateEntity):
         if hvac_mode == HVACMode.OFF:
             # Set desired temperature to absolute minimum
             new_temperature = self._desired_target_temperature = OFF_TEMPERATURE
-        
+
         if hvac_mode == HVACMode.HEAT:
             # If we were previously in OFF mode and now switched to manual, the UI still thinks, we are off, if we dont revert to some temperature, that is **not** the OFF_TEMPERATURE
-            if new_temperature == OFF_TEMPERATURE: new_temperature = DEFAULT_TEMPERATURE 
-        
+            if new_temperature == OFF_TEMPERATURE: new_temperature = DEFAULT_TEMPERATURE
+
         self._desired_mode = new_hvac_mode
 
         self._connection.set_temperature(
@@ -366,3 +367,67 @@ class MaxThermostat(ClimateEntity):
             MODE_BOOST: HVACMode.AUTO, # ?
             MODE_TEMPORARY: HVACMode.HEAT # ? vacation, away mode
         }.get(mode)
+
+
+
+class MaxValve(SensorEntity):
+    ''' Valve position sensor class of Max devices '''
+
+    def __init__(self, connection: MaxCulConnection, device_id, name):
+        self._name = name
+        self._device_id = device_id
+        self._connection = connection
+
+        self._valve = None
+
+        self._connection.add_paired_device(self.sender_id)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return {
+            "identifiers": {
+                (DOMAIN, self._device_id)
+            },
+            "name": self.name,
+        }
+
+    async def async_added_to_hass(self) -> None:
+        @callback
+        def update(payload):
+            device_id = payload.get(ATTR_DEVICE_ID)
+            if device_id != self.sender_id:
+                return
+
+            self._valve = payload.get(ATTR_VALVE_POSITION, None)
+            self._attr_available = True
+            # We don't need to check if device available here
+            self._attr_native_value = _valve
+
+            self.async_schedule_update_ha_state()
+
+        async_dispatcher_connect(self.hass, SIGNAL_THERMOSTAT_UPDATE, update)
+
+    @property
+    def name(self) -> str:
+        return self._name + '-valve'
+
+    @property
+    def unique_id(self) -> str:
+        return self._device_id + '-valve'
+
+    @property
+    def sender_id(self) -> int:
+        ''' Return the RF address of the device '''
+        return int(self._device_id)
+
+    @property
+    def should_poll(self) -> bool:
+        return False
+
+    @property
+    def entity_category(self) -> str:
+        return EntityCategory.DIAGNOSTIC
+
+    @property
+    def native_value(self) -> any:
+        return self._valve

@@ -4,7 +4,8 @@ Binary sensor platform module of MaxCUL integration
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
-    BinarySensorEntity
+    BinarySensorEntity,
+    SensorEntity
 )
 
 from homeassistant.config_entries import ConfigEntry
@@ -45,6 +46,7 @@ from custom_components.maxcul import (
 )
 
 from custom_components.maxcul.max_shutter import MaxShutter
+from custom_components.maxcul.max_thermostat import MaxValve
 
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_devices):
@@ -56,6 +58,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
     devices = []
     for device_id, device in config_entry.data.get(CONF_DEVICES).items():
         devices.append(MaxBattery(connection, device_id, device[CONF_NAME]))
+        devices.append(MaxValve(connection, device_id, device[CONF_NAME]))
         if device[CONF_TYPE] == SHUTTER_CONTACT:
             devices.append(
                 MaxShutter(hass, config_entry, connection, device_id, device[CONF_NAME])
@@ -78,6 +81,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
 
         devices_to_add = []
         devices_to_add.append(MaxBattery(connection, device_id, device_name))
+        devices_to_add.append(MaxValve(connection, device_id, device_name))
 
         device_type = payload.get(ATTR_DEVICE_TYPE)
         if device_type is SHUTTER_CONTACT:
